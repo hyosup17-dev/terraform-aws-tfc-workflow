@@ -25,7 +25,6 @@ provider "aws" {
     }
   }
 
-  
 }
 
 resource "aws_vpc" "hashicat" {
@@ -67,8 +66,8 @@ resource "aws_security_group" "hashicat" {
   }
 
   ingress {
-    from_port   = 443
-    to_port     = 443
+    from_port   = 8080
+    to_port     = 8080
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
@@ -124,16 +123,19 @@ data "aws_ami" "ubuntu" {
 }
 
 resource "aws_eip" "hashicat" {
-  instance = aws_instance.hashicat.id
+  count    = var.ec2_count
+  instance = aws_instance.hashicat[count.index].id
   domain   = "vpc"
 }
 
 resource "aws_eip_association" "hashicat" {
-  instance_id   = aws_instance.hashicat.id
+  count         = var.ec2_count
+  instance_id   = aws_instance.hashicat[count.index].id
   allocation_id = aws_eip.hashicat.id
 }
 
 resource "aws_instance" "hashicat" {
+  count                       = var.ec2_count
   ami                         = data.aws_ami.ubuntu.id
   instance_type               = var.instance_type
   key_name                    = aws_key_pair.hashicat.key_name
@@ -159,6 +161,7 @@ resource "aws_instance" "hashicat" {
 # Add execute permissions to our scripts.
 # Run the deploy_app.sh script.
 resource "null_resource" "configure_cat_app" {
+  count      = var.ec2_count
   depends_on = [aws_eip_association.hashicat]
 
   // triggers = {
@@ -173,7 +176,7 @@ resource "null_resource" "configure_cat_app" {
       type        = "ssh"
       user        = "ubuntu"
       private_key = tls_private_key.hashicat.private_key_pem
-      host        = aws_eip.hashicat.public_ip
+      host        = aws_eip.hashicat[count.index].public_ip
     }
   }
 
@@ -195,7 +198,7 @@ resource "null_resource" "configure_cat_app" {
       type        = "ssh"
       user        = "ubuntu"
       private_key = tls_private_key.hashicat.private_key_pem
-      host        = aws_eip.hashicat.public_ip
+      host        = aws_eip.hashicat[count.index].public_ip
     }
   }
 }
